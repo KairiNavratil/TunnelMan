@@ -5,34 +5,38 @@
 #include "GameConstants.h"
 #include <string>
 
-// Students:  Add code to this file, StudentWorld.cpp, Actor.h, and Actor.cpp
+class Actor;
+class Tunnelman;
+class Earth;
 
 class StudentWorld : public GameWorld
 {
 public:
-	StudentWorld(std::string assetDir)
-		: GameWorld(assetDir)
-	{
-	}
+    StudentWorld(std::string assetDir)
+        : GameWorld(assetDir), m_player(nullptr)
+    {
+        // Initialize earth array to nullptr
+        for (int x = 0; x < VIEW_WIDTH; x++)
+            for (int y = 0; y < VIEW_HEIGHT; y++)
+                m_earth[x][y] = nullptr;
+    }
 
-	virtual int init()
-	{
-		return GWSTATUS_CONTINUE_GAME;
-	}
+    virtual ~StudentWorld()
+    {
+        cleanUp();
+    }
 
-	virtual int move()
-	{
-		// This code is here merely to allow the game to build, run, and terminate after you hit enter a few times.
-		// Notice that the return value GWSTATUS_PLAYER_DIED will cause our framework to end the current level.
-		decLives();
-		return GWSTATUS_PLAYER_DIED;
-	}
+    virtual int init();
+    virtual int move();
+    virtual void cleanUp();
 
-	virtual void cleanUp()
-	{
-	}
+    // Helper to remove earth at location x,y (and the 4x4 sprite area)
+    // Returns true if any earth was removed
+    bool removeEarth(int x, int y);
 
 private:
+    Tunnelman* m_player;
+    Earth* m_earth[VIEW_WIDTH][VIEW_HEIGHT];
 };
 
 #endif // STUDENTWORLD_H_
