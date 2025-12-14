@@ -92,6 +92,7 @@ private:
     int m_numSquaresToMove;
     bool m_leaving;
     int m_ticksSincePerpendicularTurn;
+    int m_ticksSinceLastShout; // <--- ADDED
 
     bool isFacingPlayer() const;
     bool hasLineOfSightToPlayer() const;

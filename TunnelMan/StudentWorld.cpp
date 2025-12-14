@@ -17,14 +17,12 @@ GameWorld* createStudentWorld(string assetDir)
 
 StudentWorld::StudentWorld(std::string assetDir)
     : GameWorld(assetDir), m_player(nullptr), m_barrelsLeft(0),
-    m_ticksSinceLastProtester(0), m_targetNumProtesters(0), m_protesterCount(0), m_gridDirty(true)
+    m_ticksSinceLastProtester(0), m_targetNumProtesters(0), m_gridDirty(true)
 {
-    // Initialize Earth
     for (int x = 0; x < VIEW_WIDTH; x++)
         for (int y = 0; y < VIEW_HEIGHT; y++)
             m_earth[x][y] = nullptr;
 
-    // Initialize Grids
     for (int x = 0; x < VIEW_WIDTH; x++) {
         for (int y = 0; y < VIEW_HEIGHT; y++) {
             m_grid_exit[x][y] = 0;
@@ -41,7 +39,6 @@ StudentWorld::~StudentWorld()
 int StudentWorld::init()
 {
     m_barrelsLeft = 0;
-    m_protesterCount = 0;
     m_ticksSinceLastProtester = 0;
     m_targetNumProtesters = min(15, 2 + (int)(getLevel() * 1.5));
     m_gridDirty = true;
@@ -64,7 +61,7 @@ int StudentWorld::init()
     int L = min(2 + current_level, 21);
     distributeItems(B, G, L);
 
-    // 4. Initial Protester Spawn Timer
+    // 4. Force first spawn
     m_ticksSinceLastProtester = max(25, 200 - (int)getLevel());
 
     return GWSTATUS_CONTINUE_GAME;
@@ -108,9 +105,6 @@ int StudentWorld::move()
     // 3. Remove Dead
     for (auto it = m_actors.begin(); it != m_actors.end(); ) {
         if (!(*it)->isAlive()) {
-            if ((*it)->canBeAnnoyed()) { // Is protester
-                m_protesterCount--;
-            }
             delete* it;
             it = m_actors.erase(it);
         }
@@ -120,8 +114,14 @@ int StudentWorld::move()
     }
 
     // 4. Spawn Protesters
+    // Count current protesters dynamically to ensure accuracy
+    int currentProtesters = 0;
+    for (auto* a : m_actors) {
+        if (a->canBeAnnoyed()) currentProtesters++;
+    }
+
     int T = max(25, 200 - (int)getLevel());
-    if (m_protesterCount < m_targetNumProtesters && m_ticksSinceLastProtester >= T) {
+    if (currentProtesters < m_targetNumProtesters && m_ticksSinceLastProtester >= T) {
         int probHardcore = min(90, (int)getLevel() * 10 + 30);
         if (rand() % 100 < probHardcore) {
             addActor(new HardcoreProtester(this));
@@ -129,7 +129,6 @@ int StudentWorld::move()
         else {
             addActor(new RegularProtester(this));
         }
-        m_protesterCount++;
         m_ticksSinceLastProtester = 0;
     }
     m_ticksSinceLastProtester++;
@@ -269,10 +268,6 @@ bool StudentWorld::bribeEnemy(int x, int y) {
         }
     }
     return false;
-}
-
-bool StudentWorld::canSpawnProtester() {
-    return m_protesterCount < m_targetNumProtesters;
 }
 
 void StudentWorld::distributeItems(int numBoulders, int numGold, int numBarrels)

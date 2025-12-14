@@ -18,7 +18,7 @@ double Actor::getDistanceTo(Actor* other) const {
 
 void Agent::decHP(int amount) {
     m_hp -= amount;
-    // Base Agent logic does not auto-kill; derived classes handle state
+    // Base Agent doesn't auto-die anymore, derived classes handle it
 }
 
 // ============================================================================
@@ -39,12 +39,10 @@ void Tunnelman::doSomething()
 {
     if (!isAlive()) return;
 
-    // Digging
     if (getWorld()->removeEarth(getX(), getY())) {
         getWorld()->playSound(SOUND_DIG);
     }
 
-    // Input
     int ch;
     if (getWorld()->getKey(ch)) {
         switch (ch) {
@@ -130,8 +128,10 @@ void Protester::doSomething()
         return;
     }
 
-    // Calculate normal speed
+    // Calculate normal wait time for reset (Standard speed)
     int restingTicks = std::max(0, 3 - (int)getWorld()->getLevel() / 4);
+
+    // Default next wait is the standard speed
     m_ticksToWait = restingTicks;
 
     m_ticksSincePerpendicularTurn++;
@@ -139,9 +139,11 @@ void Protester::doSomething()
 
     // 2. Leaving State
     if (m_leaving) {
-        // FIX: Set wait to 1 instead of 0. 
-        // 0 = moves every tick (very fast). 1 = moves every other tick.
-        m_ticksToWait = 1;
+        // We use m_ticksToWait = 0 to make them move as fast as possible when leaving, 
+        // OR we leave it as restingTicks if we want them to walk out at normal speed.
+        // Spec usually implies they give up and leave quickly, but "resting states" might still apply.
+        // If they retreat "too fast", uncomment the line below to make them respect speed:
+        m_ticksToWait = 0; // Force fast exit (moves every tick)
 
         if (getX() == 60 && getY() == 60) {
             setDead();
@@ -164,15 +166,13 @@ void Protester::doSomething()
             getWorld()->playSound(SOUND_PROTESTER_YELL);
             getWorld()->getPlayer()->decHP(2);
             m_ticksSinceLastShout = 0;
-            m_ticksToWait = std::max(15, restingTicks * 2); // Pause after shout
+            m_ticksToWait = std::max(15, restingTicks); // Pause after shout
             return;
         }
     }
 
     // 4. Hardcore Tracking
-    // FIX: Added '&& getDistanceTo(...) > 4.0'
-    // This stops them from using pathfinding when they are already in attack range,
-    // which prevents the "oscillation/spazzing" behavior.
+    // Added > 4.0 check to prevent oscillation when already close
     if (isHardcore() && getDistanceTo(getWorld()->getPlayer()) > 4.0) {
         int M = 16 + getWorld()->getLevel() * 2;
         Direction d = getWorld()->getDirectionToPlayer(getX(), getY(), M);
@@ -187,7 +187,6 @@ void Protester::doSomething()
     }
 
     // 5. Line of Sight
-    // Check distance > 4.0 here too to be safe, though condition usually implies it
     if (hasLineOfSightToPlayer() && getDistanceTo(getWorld()->getPlayer()) > 4.0) {
         Direction d = none;
         if (getWorld()->getPlayer()->getY() == getY())
@@ -211,7 +210,6 @@ void Protester::doSomething()
         pickNewDirection();
     }
     else {
-        // Intersection Turn
         if (m_ticksSincePerpendicularTurn > 200) {
             Direction perp1 = none, perp2 = none;
             if (getDirection() == left || getDirection() == right) {
@@ -270,7 +268,7 @@ void Protester::decHP(int amount) {
         if (!m_leaving) {
             m_leaving = true;
             getWorld()->playSound(SOUND_PROTESTER_GIVE_UP);
-            m_ticksToWait = 0; // Will be set to 1 in doSomething loop next tick
+            m_ticksToWait = 0;
         }
     }
 }

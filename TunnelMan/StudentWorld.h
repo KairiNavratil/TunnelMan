@@ -25,29 +25,26 @@ public:
     // -- Accessors --
     Tunnelman* getPlayer() const { return m_player; }
 
-    // -- Earth/Physics Helpers --
+    // -- Physics --
     bool removeEarth(int x, int y);
     bool isEarthAt(int x, int y) const;
     bool isEarthBelow(int x, int y) const;
     bool isBoulderAt(int x, int y, int radius = 3);
     bool isLocationAccessible(int x, int y);
 
-    // -- Game Logic Helpers --
+    // -- Game Logic --
     void addActor(Actor* actor);
     void decreaseBarrelCount();
     void scanForItems(int x, int y, int radius);
 
-    // Protester/Squirt Interaction
-    // Returns true if at least one protester was annoyed (used to kill Squirt)
+    // Returns true if at least one protester was annoyed
     bool annoyProtesters(int x, int y, int radius, int points);
-
-    // Boulder Interaction (Annoys Player + Protesters)
+    // Annoys everyone including player
     void annoyAllNearbyActors(int x, int y, int radius, int points);
 
     bool bribeEnemy(int x, int y);
-    bool canSpawnProtester();
 
-    // -- Pathfinding --
+    // Pathfinding
     GraphObject::Direction getDirectionToExit(int x, int y);
     GraphObject::Direction getDirectionToPlayer(int x, int y, int maxMoves);
 
@@ -61,7 +58,6 @@ private:
     int m_barrelsLeft;
     int m_ticksSinceLastProtester;
     int m_targetNumProtesters;
-    int m_protesterCount;
 
     // Pathfinding Grids
     int m_grid_exit[VIEW_WIDTH][VIEW_HEIGHT];
