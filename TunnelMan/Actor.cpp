@@ -130,18 +130,16 @@ void Protester::doSomething()
         return;
     }
 
-    // Calculate normal speed
+    // Calculate normal speed for reset
     int restingTicks = std::max(0, 3 - (int)getWorld()->getLevel() / 4);
     m_ticksToWait = restingTicks;
-
     m_ticksSincePerpendicularTurn++;
     m_ticksSinceLastShout++;
 
     // 2. Leaving State
     if (m_leaving) {
-        // FIX: Set wait to 1 instead of 0. 
-        // 0 = moves every tick (very fast). 1 = moves every other tick.
-        m_ticksToWait = 1;
+        // FIX: Speed control for retreat
+        m_ticksToWait = 1; // 1 = Move every other tick (not too fast, not too slow)
 
         if (getX() == 60 && getY() == 60) {
             setDead();
@@ -158,22 +156,49 @@ void Protester::doSomething()
         return;
     }
 
-    // 3. Shout at Player
-    if (getDistanceTo(getWorld()->getPlayer()) <= 4.0 && isFacingPlayer()) {
-        if (m_ticksSinceLastShout >= 15) {
-            getWorld()->playSound(SOUND_PROTESTER_YELL);
-            getWorld()->getPlayer()->decHP(2);
-            m_ticksSinceLastShout = 0;
-            m_ticksToWait = std::max(15, restingTicks * 2); // Pause after shout
+    // 3. Interaction / Attack Logic (Prevent Overshoot)
+    double distToPlayer = getDistanceTo(getWorld()->getPlayer());
+
+    // If we are in "Attacking Range" (<= 4.0), we should mostly focus on attacking (shouting)
+    // and NOT moving, to prevent running past the player.
+    if (distToPlayer <= 4.0) {
+
+        // Attempt Shout
+        if (isFacingPlayer()) {
+            if (m_ticksSinceLastShout >= 15) {
+                getWorld()->playSound(SOUND_PROTESTER_YELL);
+                getWorld()->getPlayer()->decHP(2);
+                m_ticksSinceLastShout = 0;
+                m_ticksToWait = std::max(15, restingTicks * 2); // Pause after shout
+                return;
+            }
+            // If facing but cooldown not ready: STAND STILL.
             return;
+        }
+        else {
+            // In range but not facing. 
+            // Hardcore Logic: Should rotate to face player without moving.
+            if (isHardcore()) {
+                int M = 16 + getWorld()->getLevel() * 2;
+                Direction d = getWorld()->getDirectionToPlayer(getX(), getY(), M);
+                if (d != none) setDirection(d); // Just turn
+                return; // Don't move
+            }
+            // Regular logic: Falls through? 
+            // If we fall through, they might walk away. 
+            // Better to just stand ground if close?
+            // Spec says "If Regular sees Tunnelman... run up and shout".
+            // If close but not facing (e.g. adjacent), they should probably turn.
+            // Let's assume pathfinding LoS below handles rotation if applicable, 
+            // but to be safe against "spazzing", we can force a stop here too if we want strict stickiness.
+            // However, Regulars rely on LoS to "see". If not facing, they might not "see".
+            // So we allow Regulars to fall through if not facing.
         }
     }
 
     // 4. Hardcore Tracking
-    // FIX: Added '&& getDistanceTo(...) > 4.0'
-    // This stops them from using pathfinding when they are already in attack range,
-    // which prevents the "oscillation/spazzing" behavior.
-    if (isHardcore() && getDistanceTo(getWorld()->getPlayer()) > 4.0) {
+    // FIX: Only track if we are NOT super close. (Prevents oscillation)
+    if (isHardcore() && distToPlayer > 4.0) {
         int M = 16 + getWorld()->getLevel() * 2;
         Direction d = getWorld()->getDirectionToPlayer(getX(), getY(), M);
         if (d != none) {
@@ -187,8 +212,7 @@ void Protester::doSomething()
     }
 
     // 5. Line of Sight
-    // Check distance > 4.0 here too to be safe, though condition usually implies it
-    if (hasLineOfSightToPlayer() && getDistanceTo(getWorld()->getPlayer()) > 4.0) {
+    if (hasLineOfSightToPlayer() && distToPlayer > 4.0) {
         Direction d = none;
         if (getWorld()->getPlayer()->getY() == getY())
             d = (getWorld()->getPlayer()->getX() < getX()) ? left : right;
@@ -211,7 +235,6 @@ void Protester::doSomething()
         pickNewDirection();
     }
     else {
-        // Intersection Turn
         if (m_ticksSincePerpendicularTurn > 200) {
             Direction perp1 = none, perp2 = none;
             if (getDirection() == left || getDirection() == right) {
@@ -270,7 +293,7 @@ void Protester::decHP(int amount) {
         if (!m_leaving) {
             m_leaving = true;
             getWorld()->playSound(SOUND_PROTESTER_GIVE_UP);
-            m_ticksToWait = 0; // Will be set to 1 in doSomething loop next tick
+            m_ticksToWait = 0;
         }
     }
 }
