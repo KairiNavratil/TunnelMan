@@ -92,7 +92,7 @@ private:
     int m_numSquaresToMove;
     bool m_leaving;
     int m_ticksSincePerpendicularTurn;
-    int m_ticksSinceLastShout; // <--- ADDED
+    int m_ticksSinceLastShout;
 
     bool isFacingPlayer() const;
     bool hasLineOfSightToPlayer() const;
@@ -148,6 +148,7 @@ public:
     virtual void doSomething();
 private:
     int m_travelDist;
+    bool m_hit; // Used to delay death by 1 frame so sprite is drawn
 };
 
 #endif // ACTOR_H_
