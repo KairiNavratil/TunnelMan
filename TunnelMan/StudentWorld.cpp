@@ -19,12 +19,10 @@ StudentWorld::StudentWorld(std::string assetDir)
     : GameWorld(assetDir), m_player(nullptr), m_barrelsLeft(0),
     m_ticksSinceLastProtester(0), m_targetNumProtesters(0), m_protesterCount(0), m_gridDirty(true)
 {
-    // Initialize Earth
     for (int x = 0; x < VIEW_WIDTH; x++)
         for (int y = 0; y < VIEW_HEIGHT; y++)
             m_earth[x][y] = nullptr;
 
-    // Initialize Grids
     for (int x = 0; x < VIEW_WIDTH; x++) {
         for (int y = 0; y < VIEW_HEIGHT; y++) {
             m_grid_exit[x][y] = 0;
@@ -46,7 +44,6 @@ int StudentWorld::init()
     m_targetNumProtesters = min(15, 2 + (int)(getLevel() * 1.5));
     m_gridDirty = true;
 
-    // 1. Create Earth
     for (int x = 0; x < VIEW_WIDTH; x++) {
         for (int y = 0; y < 60; y++) {
             if (x >= 30 && x <= 33 && y >= 4) continue;
@@ -54,17 +51,14 @@ int StudentWorld::init()
         }
     }
 
-    // 2. Create Player
     m_player = new Tunnelman(this);
 
-    // 3. Distribute Items
     int current_level = getLevel();
     int B = min(current_level / 2 + 2, 9);
     int G = max(5 - current_level / 2, 2);
     int L = min(2 + current_level, 21);
     distributeItems(B, G, L);
 
-    // 4. Initial Protester Spawn Timer
     m_ticksSinceLastProtester = max(25, 200 - (int)getLevel());
 
     return GWSTATUS_CONTINUE_GAME;
@@ -74,13 +68,11 @@ int StudentWorld::move()
 {
     updateDisplayText();
 
-    // 0. Update Pathfinding
     if (m_gridDirty) {
         runBFS(60, 60, m_grid_exit);
         m_gridDirty = false;
     }
 
-    // 1. Player Move
     if (m_player->isAlive()) {
         m_player->doSomething();
     }
@@ -89,9 +81,6 @@ int StudentWorld::move()
         return GWSTATUS_PLAYER_DIED;
     }
 
-    // 2. Actors Move
-    // FIX: Cache size so newly spawned actors (like Squirts) don't update in the same tick.
-    // This allows Squirts to exist for 1 frame before collision checking, ensuring visibility.
     size_t numActors = m_actors.size();
     for (size_t i = 0; i < numActors; i++) {
         if (m_actors[i]->isAlive()) {
@@ -108,12 +97,8 @@ int StudentWorld::move()
         }
     }
 
-    // 3. Remove Dead
     for (auto it = m_actors.begin(); it != m_actors.end(); ) {
         if (!(*it)->isAlive()) {
-            if ((*it)->canBeAnnoyed()) { // Is protester
-                m_protesterCount--;
-            }
             delete* it;
             it = m_actors.erase(it);
         }
@@ -122,9 +107,14 @@ int StudentWorld::move()
         }
     }
 
-    // 4. Spawn Protesters
+    // Dynamically count protesters to ensure accuracy
+    int currentProtesters = 0;
+    for (const auto& a : m_actors) {
+        if (a->isProtester()) currentProtesters++;
+    }
+
     int T = max(25, 200 - (int)getLevel());
-    if (m_protesterCount < m_targetNumProtesters && m_ticksSinceLastProtester >= T) {
+    if (currentProtesters < m_targetNumProtesters && m_ticksSinceLastProtester >= T) {
         int probHardcore = min(90, (int)getLevel() * 10 + 30);
         if (rand() % 100 < probHardcore) {
             addActor(new HardcoreProtester(this));
@@ -132,12 +122,10 @@ int StudentWorld::move()
         else {
             addActor(new RegularProtester(this));
         }
-        m_protesterCount++;
         m_ticksSinceLastProtester = 0;
     }
     m_ticksSinceLastProtester++;
 
-    // 5. Spawn Goodies
     int G = getLevel() * 25 + 300;
     if (rand() % G == 0) {
         if (rand() % 5 == 0) {
@@ -245,7 +233,6 @@ void StudentWorld::scanForItems(int x, int y, int radius) {
     }
 }
 
-// Used by Squirt: Annoys ONLY protesters
 bool StudentWorld::annoyProtesters(int x, int y, int radius, int points) {
     bool hit = false;
     for (auto* a : m_actors) {
@@ -257,7 +244,6 @@ bool StudentWorld::annoyProtesters(int x, int y, int radius, int points) {
     return hit;
 }
 
-// Used by Boulder: Annoys Player AND Protesters
 void StudentWorld::annoyAllNearbyActors(int x, int y, int radius, int points) {
     if (m_player->getDistanceTo(x, y) <= radius) {
         m_player->decHP(points);
@@ -272,10 +258,6 @@ bool StudentWorld::bribeEnemy(int x, int y) {
         }
     }
     return false;
-}
-
-bool StudentWorld::canSpawnProtester() {
-    return m_protesterCount < m_targetNumProtesters;
 }
 
 void StudentWorld::distributeItems(int numBoulders, int numGold, int numBarrels)

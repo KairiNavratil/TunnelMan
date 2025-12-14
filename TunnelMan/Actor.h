@@ -23,9 +23,11 @@ public:
     void setDead() { m_isAlive = false; }
     StudentWorld* getWorld() const { return m_world; }
 
+    // Identification / Capabilities
     virtual bool canBeAnnoyed() const { return false; }
     virtual bool beBribed() { return false; }
     virtual bool isBoulder() const { return false; }
+    virtual bool isProtester() const { return false; } // <--- Added for reliable counting
 
     double getDistanceTo(int x, int y) const;
     double getDistanceTo(Actor* other) const;
@@ -83,6 +85,7 @@ public:
     virtual bool beBribed();
     virtual bool isHardcore() const { return false; }
     virtual bool canBeAnnoyed() const;
+    virtual bool isProtester() const { return true; } // <--- Override
 
 protected:
     int m_ticksToWait;
@@ -148,7 +151,7 @@ public:
     virtual void doSomething();
 private:
     int m_travelDist;
-    bool m_hit; // Used to delay death by 1 frame so sprite is drawn
+    bool m_hit;
 };
 
 #endif // ACTOR_H_

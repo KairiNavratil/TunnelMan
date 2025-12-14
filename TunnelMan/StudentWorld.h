@@ -37,11 +37,7 @@ public:
     void decreaseBarrelCount();
     void scanForItems(int x, int y, int radius);
 
-    // Protester/Squirt Interaction
-    // Returns true if at least one protester was annoyed (used to kill Squirt)
     bool annoyProtesters(int x, int y, int radius, int points);
-
-    // Boulder Interaction (Annoys Player + Protesters)
     void annoyAllNearbyActors(int x, int y, int radius, int points);
 
     bool bribeEnemy(int x, int y);
@@ -61,9 +57,8 @@ private:
     int m_barrelsLeft;
     int m_ticksSinceLastProtester;
     int m_targetNumProtesters;
-    int m_protesterCount;
+    int m_protesterCount; // Kept for member variable compliance, but unused in logic loop
 
-    // Pathfinding Grids
     int m_grid_exit[VIEW_WIDTH][VIEW_HEIGHT];
     int m_grid_player[VIEW_WIDTH][VIEW_HEIGHT];
     bool m_gridDirty;

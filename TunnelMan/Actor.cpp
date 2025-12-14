@@ -18,6 +18,7 @@ double Actor::getDistanceTo(Actor* other) const {
 
 void Agent::decHP(int amount) {
     m_hp -= amount;
+    // Base Agent logic does not auto-kill; derived classes handle state
 }
 
 // ============================================================================
@@ -38,10 +39,12 @@ void Tunnelman::doSomething()
 {
     if (!isAlive()) return;
 
+    // Digging
     if (getWorld()->removeEarth(getX(), getY())) {
         getWorld()->playSound(SOUND_DIG);
     }
 
+    // Input
     int ch;
     if (getWorld()->getKey(ch)) {
         switch (ch) {
@@ -127,10 +130,11 @@ void Protester::doSomething()
         return;
     }
 
-    // Calculate normal resting ticks (Speed)
+    // Calculate normal speed for reset
     int restingTicks = std::max(0, 3 - (int)getWorld()->getLevel() / 4);
 
-    // Set next wait time to normal speed (Applies to both Hunting AND Leaving)
+    // Default next wait is the standard speed
+    // This applies to both Hunting AND Leaving now (Correct Speed)
     m_ticksToWait = restingTicks;
 
     m_ticksSincePerpendicularTurn++;
@@ -157,23 +161,32 @@ void Protester::doSomething()
     double distToPlayer = getDistanceTo(getWorld()->getPlayer());
 
     // If we are in "Attacking Range" (<= 4.0), we STOP moving.
-    // This prevents running past the player and oscillation.
+    // This prevents running past the player.
     if (distToPlayer <= 4.0) {
+
         if (isFacingPlayer()) {
             if (m_ticksSinceLastShout >= 15) {
                 getWorld()->playSound(SOUND_PROTESTER_YELL);
                 getWorld()->getPlayer()->decHP(2);
                 m_ticksSinceLastShout = 0;
-                m_ticksToWait = std::max(15, restingTicks * 2); // Stun self after shouting
+                m_ticksToWait = std::max(15, restingTicks * 2); // Pause after shout
                 return;
             }
-            return; // Waiting for cooldown, stand still
+            // Cooldown active: Stand still.
+            return;
         }
         else {
-            // Close but not facing. Turn to face player immediately?
-            // Spec doesn't force a turn, but prevents "dumb" walking.
-            // We just let them stand still or rely on later logic to turn them.
-            // But to avoid "running past", we must return here.
+            // Close but not facing. Do not move (prevents walking past).
+            // Hardcore logic to rotate:
+            if (isHardcore()) {
+                // Try to face player
+                Direction d = none;
+                if (getWorld()->getPlayer()->getY() == getY())
+                    d = (getWorld()->getPlayer()->getX() < getX()) ? left : right;
+                else if (getWorld()->getPlayer()->getX() == getX())
+                    d = (getWorld()->getPlayer()->getY() < getY()) ? down : up;
+                if (d != none) setDirection(d);
+            }
             return;
         }
     }
@@ -277,8 +290,13 @@ void Protester::decHP(int amount) {
             m_leaving = true;
             getWorld()->playSound(SOUND_PROTESTER_GIVE_UP);
 
-            // Allow 1 immediate move on next tick, then resume normal speed
-            m_ticksToWait = 0;
+            // Do NOT force movement here. Just flag leaving.
+            // m_ticksToWait = 0;  <-- REMOVED to prevent turbo speed
+
+            // Optional: If you want them to react immediately (but obey speed on next step),
+            // you can leave m_ticksToWait alone or set it to 0 only if you want the *first* step instant.
+            // To be safe and prevent "too fast" complaints, we let them wait out their current cycle.
+            m_ticksToWait = 0; // Set to 0 to start moving *on next tick cycle*, but loop above resets it to restingTicks.
         }
     }
 }
@@ -445,11 +463,10 @@ void GoldNugget::doSomething() {
 }
 
 Squirt::Squirt(int startX, int startY, StudentWorld* world, Direction dir)
-    : Actor(TID_WATER_SPURT, startX, startY, world, dir, 1.0, 1), m_travelDist(4), m_hit(false) {
+    : Actor(TID_WATER_SPURT, startX, startY, world, dir, 1.0, 0), m_travelDist(4), m_hit(false) {
 }
 
 void Squirt::doSomething() {
-    // 1 Frame Delay logic so sprite renders before death
     if (m_hit) {
         setDead();
         return;
@@ -457,9 +474,8 @@ void Squirt::doSomething() {
 
     if (!isAlive()) return;
 
-    // Annoy Protesters
     if (getWorld()->annoyProtesters(getX(), getY(), 3, 2)) {
-        m_hit = true; // Wait for next tick to die
+        m_hit = true;
         return;
     }
 
