@@ -133,13 +133,14 @@ void Protester::doSomething()
     // Calculate normal speed for reset
     int restingTicks = std::max(0, 3 - (int)getWorld()->getLevel() / 4);
     m_ticksToWait = restingTicks;
+
     m_ticksSincePerpendicularTurn++;
     m_ticksSinceLastShout++;
 
     // 2. Leaving State
     if (m_leaving) {
-        // FIX: Speed control for retreat
-        m_ticksToWait = 1; // 1 = Move every other tick (not too fast, not too slow)
+        // FIX: Leaving uses default walking speed (not fast retreat), based on feedback.
+        // m_ticksToWait is already set to restingTicks above.
 
         if (getX() == 60 && getY() == 60) {
             setDead();
@@ -156,14 +157,13 @@ void Protester::doSomething()
         return;
     }
 
-    // 3. Interaction / Attack Logic (Prevent Overshoot)
+    // 3. Interaction / Attack Logic (Prevent Overshoot/Zig-Zag)
     double distToPlayer = getDistanceTo(getWorld()->getPlayer());
 
-    // If we are in "Attacking Range" (<= 4.0), we should mostly focus on attacking (shouting)
-    // and NOT moving, to prevent running past the player.
+    // If we are in "Attacking Range" (<= 4.0), we STOP moving.
+    // This prevents running past the player.
     if (distToPlayer <= 4.0) {
 
-        // Attempt Shout
         if (isFacingPlayer()) {
             if (m_ticksSinceLastShout >= 15) {
                 getWorld()->playSound(SOUND_PROTESTER_YELL);
@@ -172,32 +172,26 @@ void Protester::doSomething()
                 m_ticksToWait = std::max(15, restingTicks * 2); // Pause after shout
                 return;
             }
-            // If facing but cooldown not ready: STAND STILL.
+            // Cooldown active: Stand still.
             return;
         }
         else {
-            // In range but not facing. 
-            // Hardcore Logic: Should rotate to face player without moving.
-            if (isHardcore()) {
-                int M = 16 + getWorld()->getLevel() * 2;
-                Direction d = getWorld()->getDirectionToPlayer(getX(), getY(), M);
-                if (d != none) setDirection(d); // Just turn
-                return; // Don't move
-            }
-            // Regular logic: Falls through? 
-            // If we fall through, they might walk away. 
-            // Better to just stand ground if close?
-            // Spec says "If Regular sees Tunnelman... run up and shout".
-            // If close but not facing (e.g. adjacent), they should probably turn.
-            // Let's assume pathfinding LoS below handles rotation if applicable, 
-            // but to be safe against "spazzing", we can force a stop here too if we want strict stickiness.
-            // However, Regulars rely on LoS to "see". If not facing, they might not "see".
-            // So we allow Regulars to fall through if not facing.
+            // Close but not facing. Turn to face player immediately.
+            // Simplified "turn towards" logic
+            Direction d = none;
+            if (getWorld()->getPlayer()->getY() == getY())
+                d = (getWorld()->getPlayer()->getX() < getX()) ? left : right;
+            else if (getWorld()->getPlayer()->getX() == getX())
+                d = (getWorld()->getPlayer()->getY() < getY()) ? down : up;
+
+            // If strictly aligned, turn. If diagonal, we can't shout, so just stand or turn roughly.
+            // Let's just do nothing if diagonal close, or turn Up/Down/Left/Right based on delta.
+            if (d != none) setDirection(d);
+            return; // Stand still.
         }
     }
 
     // 4. Hardcore Tracking
-    // FIX: Only track if we are NOT super close. (Prevents oscillation)
     if (isHardcore() && distToPlayer > 4.0) {
         int M = 16 + getWorld()->getLevel() * 2;
         Direction d = getWorld()->getDirectionToPlayer(getX(), getY(), M);
@@ -235,6 +229,7 @@ void Protester::doSomething()
         pickNewDirection();
     }
     else {
+        // Intersection Turn
         if (m_ticksSincePerpendicularTurn > 200) {
             Direction perp1 = none, perp2 = none;
             if (getDirection() == left || getDirection() == right) {
